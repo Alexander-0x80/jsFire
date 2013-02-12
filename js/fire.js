@@ -1,47 +1,86 @@
 (function(){
     'use strict';
 
+    var colors = 256;
+
     var canvas = document.getElementById("fire");
     var context = canvas.getContext("2d");
-    var image = context.getImageData(0,0,canvas.width,canvas.height);
-    var buffer = canvas.width * canvas.height;
-    var pallete = new Array(256);
-    var tPallete = Uint8Array(new ArrayBuffer(256*3));
+    var image  = context.getImageData(0,0,canvas.width,canvas.height);
 
-    for (var i=0;i<pallete.length;i++){
-        pallete[i] = hsl2Rgb((i/255)/3,1,(Math.min(255,i*2)/255));
-        tPallete[3*i]   = pallete[i][0];
-        tPallete[3*i+1] = pallete[i][1];
-        tPallete[3*i+2] = pallete[i][2];
+    var pallete = new Uint8Array(new ArrayBuffer(colors*3));
+    var buffer = new ArrayBuffer(canvas.width * canvas.height * 4);
+    var pixels = new Uint8ClampedArray(buffer);
+
+    var requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame ||
+                                window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
+
+    window.requestAnimationFrame = requestAnimationFrame;
+
+
+    /* Creates a color pallate */
+    for (var i=0 ,c;i<colors;i++){
+        c = hsl2Rgb((i/255)/3,1,(Math.min(255,i*2)/255));
+        pallete[3*i]   = c[0];
+        pallete[3*i+1] = c[1];
+        pallete[3*i+2] = c[2];
     }
 
 
+    var imageData = image.data;
     render();
 
     function render(){
-        var imageData = image.data;
 
-        for(var i=0;i<pallete.length;i++){
-            imageData[4*i]    = tPallete[3*i];
-            imageData[4*i +1] = tPallete[3*i+1];
-            imageData[4*i +2] = tPallete[3*i+2];
-            imageData[4*i +3] = 255;
-        }
-
-        var px = buffer;
-        console.time("render");
-        while(px-- > 256)
-         {
-
-            imageData[4*px]    = tPallete[40];
-            imageData[4*px +1] = tPallete[30];
-            imageData[4*px +2] = tPallete[30];
-            imageData[4*px +3] = 255;
-        }
-        console.timeEnd("render");
+        randomizeFrame();
+        performGeneration();
+        imageData.set(pixels);
 
         context.putImageData(image,0,0);
+        requestAnimationFrame(render,canvas);
     }
+
+
+
+
+
+    /* Declarations */
+
+    function randomizeFrame(){
+        var start = pixels.length - canvas.width*4;
+
+        for(var i=0;i<canvas.width;i++){
+            // Get random color from pallete , each color is 3 bytes
+            // so adjust random number to match that .
+            var rand = Math.round(getRandomInt(1,255)/3) *3;
+            pixels[start + 4*i]    = pallete[rand];
+            pixels[1+ start + 4*i] = pallete[rand+1];
+            pixels[2+ start + 4*i] = pallete[rand+2];
+            pixels[3+ start + 4*i] = 255;
+        }
+    }
+
+
+    function performGeneration(){
+        var oneLine = canvas.width*4;
+
+
+
+        for(var y=0;y<canvas.height-1;y++){
+            var start = oneLine*y;
+            for(var x=0;x<canvas.width;x++){
+                var thisPixel = start + 4*x;
+                pixels[thisPixel]    = ((pixels[thisPixel+oneLine] + pixels[thisPixel + oneLine +4] +pixels[thisPixel + oneLine -4] +pixels[thisPixel + oneLine*2] )*32)/120;
+                pixels[1+ thisPixel] = ((pixels[1+ thisPixel+oneLine] + pixels[1+ thisPixel + oneLine +4] +pixels[1+ thisPixel + oneLine -4 ] +pixels[1+ thisPixel + oneLine*2] )*32)/120;
+                pixels[2+ thisPixel] = ((pixels[2+ thisPixel+oneLine] + pixels[2+ thisPixel + oneLine +4] +pixels[2+ thisPixel + oneLine -4] +pixels[2+ thisPixel + oneLine*2] )*32)/120;
+                pixels[3+ thisPixel] = 255;
+            }
+        }
+    }
+
+    function getRandomInt(min,max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
     /**
      * Converts an HSL color value to RGB. Conversion formula
      * adapted from http://en.wikipedia.org/wiki/HSL_color_space.
@@ -78,6 +117,4 @@
 
         return [Math.floor(r*255),Math.floor(g*255),Math.floor(b*255)];
     }
-
-
 })();
