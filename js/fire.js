@@ -1,81 +1,84 @@
 (function(){
     'use strict';
 
-    var colors = 256;
-
+    var colors = 0xFF;
     var canvas = document.getElementById("fire");
     var context = canvas.getContext("2d");
     var image  = context.getImageData(0,0,canvas.width,canvas.height);
+    var pallete = new Uint8ClampedArray(new ArrayBuffer(colors*3));
 
-    var pallete = new Uint8Array(new ArrayBuffer(colors*3));
-    var buffer = new ArrayBuffer(canvas.width * canvas.height * 4);
-    var pixels = new Uint8ClampedArray(buffer);
-
-    var requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame ||
-                                window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
+    var requestAnimationFrame = window.requestAnimationFrame 
+        || window.mozRequestAnimationFrame 
+        || window.webkitRequestAnimationFrame
+        || window.msRequestAnimationFrame;
 
     window.requestAnimationFrame = requestAnimationFrame;
 
-
-    /* Creates a color pallate */
-    for (var i=0 ,c;i<colors;i++){
+    /* Create color pallete */
+    for (var i=0,c;i<colors;i++){
         c = hsl2Rgb((i/255)/3,1,(Math.min(255,i*2)/255));
         pallete[3*i]   = c[0];
         pallete[3*i+1] = c[1];
         pallete[3*i+2] = c[2];
     }
 
-
     var imageData = image.data;
     render();
 
+
+    /* Main Loop */
     function render(){
+        
+        var start = imageData.length - canvas.width*4;
+        var oneLine = canvas.width*4;
 
-        randomizeFrame();
-        performGeneration();
-        imageData.set(pixels);
+        /* Randomize bottom line */
+        for(var i=0;i<canvas.width;i++){
+            // Get random color from pallete , each color is 3 bytes
+            // so adjust random number to match that .
+            var rand = Math.round(getRandomInt(1,255)/3) *3;
+            imageData[start + 4*i]    = pallete[rand];
+            imageData[1+ start + 4*i] = pallete[rand+1];
+            imageData[2+ start + 4*i] = pallete[rand+2];
+            imageData[3+ start + 4*i] = 255;
+        }
+        
+        /* Perform full generation */
+        for(var y=0,start=0;y<canvas.height;y++,start=oneLine*y){
+            for(var x=0,thisPixel=0;x<canvas.width;x++,thisPixel=start+4*x){
+                // Red
+                imageData[thisPixel] = ((imageData[thisPixel+oneLine] 
+                    +imageData[thisPixel + oneLine +4] 
+                    +imageData[thisPixel + oneLine -4] 
+                    +imageData[thisPixel + oneLine *2] 
+                )*32)/120;
 
+                // Green
+                imageData[1+ thisPixel] = ((imageData[1+ thisPixel+oneLine] 
+                    +imageData[1+ thisPixel + oneLine +4] 
+                    +imageData[1+ thisPixel + oneLine -4] 
+                    +imageData[1+ thisPixel + oneLine *2] 
+                )*32)/120;
+
+                // Blue
+                imageData[2+ thisPixel] = ((imageData[2+ thisPixel+oneLine] 
+                    +imageData[2+ thisPixel + oneLine +4] 
+                    +imageData[2+ thisPixel + oneLine -4] 
+                    +imageData[2+ thisPixel + oneLine *2] 
+                )*32)/120;
+
+                // Alpha
+                imageData[3+ thisPixel] = 0xFF;
+            }
+        }
+
+        /* Update screen */
         context.putImageData(image,0,0);
         requestAnimationFrame(render,canvas);
     }
 
 
-
-
-
     /* Declarations */
-
-    function randomizeFrame(){
-        var start = pixels.length - canvas.width*4;
-
-        for(var i=0;i<canvas.width;i++){
-            // Get random color from pallete , each color is 3 bytes
-            // so adjust random number to match that .
-            var rand = Math.round(getRandomInt(1,255)/3) *3;
-            pixels[start + 4*i]    = pallete[rand];
-            pixels[1+ start + 4*i] = pallete[rand+1];
-            pixels[2+ start + 4*i] = pallete[rand+2];
-            pixels[3+ start + 4*i] = 255;
-        }
-    }
-
-
-    function performGeneration(){
-        var oneLine = canvas.width*4;
-
-
-
-        for(var y=0;y<canvas.height-1;y++){
-            var start = oneLine*y;
-            for(var x=0;x<canvas.width;x++){
-                var thisPixel = start + 4*x;
-                pixels[thisPixel]    = ((pixels[thisPixel+oneLine] + pixels[thisPixel + oneLine +4] +pixels[thisPixel + oneLine -4] +pixels[thisPixel + oneLine*2] )*32)/120;
-                pixels[1+ thisPixel] = ((pixels[1+ thisPixel+oneLine] + pixels[1+ thisPixel + oneLine +4] +pixels[1+ thisPixel + oneLine -4 ] +pixels[1+ thisPixel + oneLine*2] )*32)/120;
-                pixels[2+ thisPixel] = ((pixels[2+ thisPixel+oneLine] + pixels[2+ thisPixel + oneLine +4] +pixels[2+ thisPixel + oneLine -4] +pixels[2+ thisPixel + oneLine*2] )*32)/120;
-                pixels[3+ thisPixel] = 255;
-            }
-        }
-    }
 
     function getRandomInt(min,max) {
         return Math.floor(Math.random() * (max - min + 1)) + min;
